@@ -627,6 +627,14 @@ static const DisplayChangeListenerOps dcl_ops = {
 
 #if defined(CONFIG_OPENGL)
 
+static const DisplayGLOps dg_gl_area_ops = {
+    .dpy_gl_ctx_create          = gd_gl_area_create_context,
+    .dpy_gl_ctx_destroy         = gd_gl_area_destroy_context,
+    .dpy_gl_ctx_make_current    = gd_gl_area_make_current,
+    .dpy_gl_scanout_get_enabled = gd_gl_area_scanout_get_enabled,
+    .dpy_gl_scanout_texture     = gd_gl_area_scanout_texture,
+};
+
 static const DisplayChangeListenerOps dcl_gl_area_ops = {
     .dpy_name             = "gtk-egl",
     .dpy_gfx_update       = gd_gl_area_update,
@@ -636,14 +644,22 @@ static const DisplayChangeListenerOps dcl_gl_area_ops = {
     .dpy_mouse_set        = gd_mouse_set,
     .dpy_cursor_define    = gd_cursor_define,
 
-    .dpy_gl_ctx_create       = gd_gl_area_create_context,
-    .dpy_gl_ctx_destroy      = gd_gl_area_destroy_context,
-    .dpy_gl_ctx_make_current = gd_gl_area_make_current,
-    .dpy_gl_scanout_texture  = gd_gl_area_scanout_texture,
-    .dpy_gl_update           = gd_gl_area_scanout_flush,
+    .dpy_gl_update        = gd_gl_area_scanout_flush,
 };
 
 #endif /* CONFIG_OPENGL */
+
+static const DisplayGLOps dg_egl_ops = {
+    .dpy_gl_ctx_create       = gd_egl_create_context,
+    .dpy_gl_ctx_destroy      = qemu_egl_destroy_context,
+    .dpy_gl_ctx_make_current = gd_egl_make_current,
+    .dpy_gl_scanout_disable  = gd_egl_scanout_disable,
+    .dpy_gl_scanout_texture  = gd_egl_scanout_texture,
+    .dpy_gl_scanout_dmabuf   = gd_egl_scanout_dmabuf,
+    .dpy_gl_cursor_dmabuf    = gd_egl_cursor_dmabuf,
+    .dpy_gl_cursor_position  = gd_egl_cursor_position,
+    .dpy_gl_release_dmabuf   = gd_egl_release_dmabuf,
+};
 
 static const DisplayChangeListenerOps dcl_egl_ops = {
     .dpy_name             = "gtk-egl",
@@ -654,16 +670,7 @@ static const DisplayChangeListenerOps dcl_egl_ops = {
     .dpy_mouse_set        = gd_mouse_set,
     .dpy_cursor_define    = gd_cursor_define,
 
-    .dpy_gl_ctx_create       = gd_egl_create_context,
-    .dpy_gl_ctx_destroy      = qemu_egl_destroy_context,
-    .dpy_gl_ctx_make_current = gd_egl_make_current,
-    .dpy_gl_scanout_disable  = gd_egl_scanout_disable,
-    .dpy_gl_scanout_texture  = gd_egl_scanout_texture,
-    .dpy_gl_scanout_dmabuf   = gd_egl_scanout_dmabuf,
-    .dpy_gl_cursor_dmabuf    = gd_egl_cursor_dmabuf,
-    .dpy_gl_cursor_position  = gd_egl_cursor_position,
-    .dpy_gl_release_dmabuf   = gd_egl_release_dmabuf,
-    .dpy_gl_update           = gd_egl_scanout_flush,
+    .dpy_gl_update        = gd_egl_scanout_flush,
 };
 
 #endif /* CONFIG_OPENGL */
@@ -2040,6 +2047,7 @@ static GSList *gd_vc_gfx_init(GtkDisplayState *s, VirtualConsole *vc,
     vc->gfx.kbd = qkbd_state_init(con);
     vc->gfx.dcl.con = con;
 
+    console_set_displayglcontext(con, vc);
     register_displaychangelistener(&vc->gfx.dcl);
 
     gd_connect_vc_gfx_signals(vc);
@@ -2128,6 +2136,16 @@ static GtkWidget *gd_create_menu_view(GtkDisplayState *s)
 
     separator = gtk_separator_menu_item_new();
     gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), separator);
+
+#if defined(CONFIG_OPENGL)
+    if (display_opengl) {
+        if (gtk_use_gl_area) {
+            register_displayglops(&dg_gl_area_ops);
+        } else {
+            register_displayglops(&dg_egl_ops);
+        }
+    }
+#endif
 
     /* gfx */
     for (vc = 0;; vc++) {

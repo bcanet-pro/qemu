@@ -392,7 +392,7 @@ u2f="auto"
 libusb="$default_feature"
 usb_redir="$default_feature"
 opengl="$default_feature"
-opengl_dmabuf="no"
+egl="no"
 cpuid_h="no"
 avx2_opt="$default_feature"
 capstone="auto"
@@ -3590,16 +3590,13 @@ if test "$opengl" != "no" ; then
   fi
 fi
 
-if test "$gbm" = "yes" && test "$opengl" = "yes"; then
+if test "$opengl" = "yes"; then
   cat > $TMPC << EOF
 #include <epoxy/egl.h>
-#ifndef EGL_MESA_image_dma_buf_export
-# error mesa/epoxy lacks support for dmabufs (mesa 10.6+)
-#endif
 int main(void) { return 0; }
 EOF
   if compile_prog "" "" ; then
-    opengl_dmabuf=yes
+    egl=yes
   fi
 fi
 
@@ -5882,8 +5879,8 @@ if test "$opengl" = "yes" ; then
   echo "CONFIG_OPENGL=y" >> $config_host_mak
   echo "OPENGL_CFLAGS=$opengl_cflags" >> $config_host_mak
   echo "OPENGL_LIBS=$opengl_libs" >> $config_host_mak
-  if test "$opengl_dmabuf" = "yes" ; then
-    echo "CONFIG_OPENGL_DMABUF=y" >> $config_host_mak
+  if test "$egl" = "yes" ; then
+    echo "CONFIG_EGL=y" >> $config_host_mak
   fi
 fi
 

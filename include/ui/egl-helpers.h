@@ -3,7 +3,7 @@
 
 #include <epoxy/gl.h>
 #include <epoxy/egl.h>
-#ifdef CONFIG_OPENGL_DMABUF
+#ifdef CONFIG_GBM
 #include <gbm.h>
 #endif
 #include "ui/console.h"
@@ -33,7 +33,7 @@ void egl_texture_blit(QemuGLShader *gls, egl_fb *dst, egl_fb *src, bool flip);
 void egl_texture_blend(QemuGLShader *gls, egl_fb *dst, egl_fb *src, bool flip,
                        int x, int y, double scale_x, double scale_y);
 
-#ifdef CONFIG_OPENGL_DMABUF
+#ifdef CONFIG_GBM
 
 extern int qemu_egl_rn_fd;
 extern struct gbm_device *qemu_egl_rn_gbm_dev;
@@ -48,8 +48,9 @@ void egl_dmabuf_release_texture(QemuDmaBuf *dmabuf);
 
 #endif
 
-EGLSurface qemu_egl_init_surface_x11(EGLContext ectx, EGLNativeWindowType win);
+EGLSurface qemu_egl_init_surface(EGLContext ectx, EGLNativeWindowType win);
 
+int qemu_egl_init_dpy_cocoa(DisplayGLMode mode);
 int qemu_egl_init_dpy_x11(EGLNativeDisplayType dpy, DisplayGLMode mode);
 int qemu_egl_init_dpy_mesa(EGLNativeDisplayType dpy, DisplayGLMode mode);
 EGLContext qemu_egl_init_ctx(void);

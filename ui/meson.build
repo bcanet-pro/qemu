@@ -46,13 +46,15 @@ endif
 if config_host.has_key('CONFIG_OPENGL')
   opengl_ss = ss.source_set()
   opengl_ss.add(when: [opengl, pixman, 'CONFIG_OPENGL'],
-               if_true: files('shader.c', 'console-gl.c', 'egl-helpers.c', 'egl-context.c'))
+               if_true: files('shader.c', 'console-gl.c'))
+  opengl_ss.add(when: [opengl, pixman, 'CONFIG_OPENGL', 'CONFIG_EGL'],
+               if_true: files('egl-helpers.c', 'egl-context.c'))
   ui_modules += {'opengl' : opengl_ss}
 endif
 
-if config_host.has_key('CONFIG_OPENGL_DMABUF')
+if config_host.has_key('CONFIG_EGL') and config_host.has_key('CONFIG_GBM')
   egl_headless_ss = ss.source_set()
-  egl_headless_ss.add(when: [opengl, pixman, 'CONFIG_OPENGL_DMABUF'],
+  egl_headless_ss.add(when: [opengl, pixman, 'CONFIG_EGL', 'CONFIG_GBM'],
                       if_true: files('egl-headless.c'))
   ui_modules += {'egl-headless' : egl_headless_ss}
 endif
