@@ -309,6 +309,7 @@ static void handleAnyDeviceErrors(Error * err)
     BOOL isMouseDeassociated;
 }
 - (void) updateUIInfo;
+- (NSSize) computeUnzoomedSize;
 - (NSSize) fixZoomedFullScreenSize:(NSSize)proposedSize;
 - (void) resizeWindow;
 - (void) switchSurface:(pixman_image_t *)image;
@@ -486,6 +487,14 @@ QemuCocoaView *cocoaView;
     }
 }
 
+- (NSSize) computeUnzoomedSize
+{
+    CGFloat width = (CGFloat)screen.width / [[self window] backingScaleFactor];
+    CGFloat height = (CGFloat)screen.height / [[self window] backingScaleFactor];
+
+    return NSMakeSize(width, height);
+}
+
 - (NSSize) fixZoomedFullScreenSize:(NSSize)proposedSize
 {
     NSSize size;
@@ -509,7 +518,7 @@ QemuCocoaView *cocoaView;
     [[self window] setContentAspectRatio:NSMakeSize(screen.width, screen.height)];
 
     if (([[self window] styleMask] & NSWindowStyleMaskResizable) == 0) {
-        [[self window] setContentSize:NSMakeSize(screen.width, screen.height)];
+        [[self window] setContentSize:[self computeUnzoomedSize]];
         [[self window] center];
     } else if (([[self window] styleMask] & NSWindowStyleMaskFullScreen) != 0) {
         [[self window] setContentSize:[self fixZoomedFullScreenSize:[[[self window] screen] frame].size]];
@@ -546,10 +555,12 @@ QemuCocoaView *cocoaView;
         info.height_mm = 0;
     }
 
+    NSSize frameBackingSize = [self convertSizeToBacking:frameSize];
+
     info.xoff = 0;
     info.yoff = 0;
-    info.width = frameSize.width;
-    info.height = frameSize.height;
+    info.width = frameBackingSize.width;
+    info.height = frameBackingSize.height;
 
     dpy_set_ui_info(dcl.con, &info);
 }
@@ -1207,7 +1218,7 @@ QemuCocoaView *cocoaView;
 - (NSSize) window:(NSWindow *)window willUseFullScreenContentSize:(NSSize)proposedSize
 {
     if (([normalWindow styleMask] & NSWindowStyleMaskResizable) == 0) {
-        return NSMakeSize([cocoaView gscreen].width, [cocoaView gscreen].height);
+        return [cocoaView computeUnzoomedSize];
     }
 
     return [cocoaView fixZoomedFullScreenSize:proposedSize];
