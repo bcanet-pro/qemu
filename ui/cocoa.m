@@ -72,8 +72,24 @@ typedef struct {
     int height;
 } QEMUScreen;
 
+static void cocoa_update(DisplayChangeListener *dcl,
+                         int x, int y, int w, int h);
+
+static void cocoa_switch(DisplayChangeListener *dcl,
+                         DisplaySurface *surface);
+
+static void cocoa_refresh(DisplayChangeListener *dcl);
+
 NSWindow *normalWindow, *about_window;
-static DisplayChangeListener *dcl;
+static const DisplayChangeListenerOps dcl_ops = {
+    .dpy_name          = "cocoa",
+    .dpy_gfx_update = cocoa_update,
+    .dpy_gfx_switch = cocoa_switch,
+    .dpy_refresh = cocoa_refresh,
+};
+static DisplayChangeListener dcl = {
+    .ops = &dcl_ops,
+};
 static int last_buttons;
 static int cursor_hide = 1;
 
@@ -523,7 +539,7 @@ QemuCocoaView *cocoaView;
     NSSize frameSize;
     QemuUIInfo info;
 
-    if (!qemu_console_is_graphic(dcl->con)) {
+    if (!qemu_console_is_graphic(dcl.con)) {
         return;
     }
 
@@ -547,7 +563,7 @@ QemuCocoaView *cocoaView;
     info.width = frameSize.width;
     info.height = frameSize.height;
 
-    dpy_set_ui_info(dcl->con, &info);
+    dpy_set_ui_info(dcl.con, &info);
 }
 
 - (void)viewDidMoveToWindow
@@ -634,15 +650,15 @@ QemuCocoaView *cocoaView;
     // Toggle the stored state.
     modifiers_state[keycode] = !modifiers_state[keycode];
     // Send a keyup or keydown depending on the state.
-    qemu_input_event_send_key_qcode(dcl->con, keycode, modifiers_state[keycode]);
+    qemu_input_event_send_key_qcode(dcl.con, keycode, modifiers_state[keycode]);
 }
 
 - (void) toggleStatefulModifier: (int)keycode {
     // Toggle the stored state.
     modifiers_state[keycode] = !modifiers_state[keycode];
     // Generate keydown and keyup.
-    qemu_input_event_send_key_qcode(dcl->con, keycode, true);
-    qemu_input_event_send_key_qcode(dcl->con, keycode, false);
+    qemu_input_event_send_key_qcode(dcl.con, keycode, true);
+    qemu_input_event_send_key_qcode(dcl.con, keycode, false);
 }
 
 // Does the work of sending input to the monitor
@@ -826,7 +842,7 @@ QemuCocoaView *cocoaView;
             }
 
             if (qemu_console_is_graphic(NULL)) {
-                qemu_input_event_send_key_qcode(dcl->con, keycode, true);
+                qemu_input_event_send_key_qcode(dcl.con, keycode, true);
             } else {
                 [self handleMonitorInput: event];
             }
@@ -841,7 +857,7 @@ QemuCocoaView *cocoaView;
             }
 
             if (qemu_console_is_graphic(NULL)) {
-                qemu_input_event_send_key_qcode(dcl->con, keycode, false);
+                qemu_input_event_send_key_qcode(dcl.con, keycode, false);
             }
             break;
         case NSEventTypeMouseMoved:
@@ -919,9 +935,9 @@ QemuCocoaView *cocoaView;
             /* Determine if this is a scroll up or scroll down event */
                 buttons = ([event deltaY] > 0) ?
                     INPUT_BUTTON_WHEEL_UP : INPUT_BUTTON_WHEEL_DOWN;
-                qemu_input_queue_btn(dcl->con, buttons, true);
+                qemu_input_queue_btn(dcl.con, buttons, true);
                 qemu_input_event_sync();
-                qemu_input_queue_btn(dcl->con, buttons, false);
+                qemu_input_queue_btn(dcl.con, buttons, false);
                 qemu_input_event_sync();
             }
             /*
@@ -949,7 +965,7 @@ QemuCocoaView *cocoaView;
                 [INPUT_BUTTON_MIDDLE]     = MOUSE_EVENT_MBUTTON,
                 [INPUT_BUTTON_RIGHT]      = MOUSE_EVENT_RBUTTON
             };
-            qemu_input_update_buttons(dcl->con, bmap, last_buttons, buttons);
+            qemu_input_update_buttons(dcl.con, bmap, last_buttons, buttons);
             last_buttons = buttons;
         }
         if (isMouseGrabbed) {
@@ -959,12 +975,12 @@ QemuCocoaView *cocoaView;
                  * clicks in the titlebar.
                  */
                 if ([self screenContainsPoint:p]) {
-                    qemu_input_queue_abs(dcl->con, INPUT_AXIS_X, p.x, 0, screen.width);
-                    qemu_input_queue_abs(dcl->con, INPUT_AXIS_Y, screen.height - p.y, 0, screen.height);
+                    qemu_input_queue_abs(dcl.con, INPUT_AXIS_X, p.x, 0, screen.width);
+                    qemu_input_queue_abs(dcl.con, INPUT_AXIS_Y, screen.height - p.y, 0, screen.height);
                 }
             } else {
-                qemu_input_queue_rel(dcl->con, INPUT_AXIS_X, (int)[event deltaX]);
-                qemu_input_queue_rel(dcl->con, INPUT_AXIS_Y, (int)[event deltaY]);
+                qemu_input_queue_rel(dcl.con, INPUT_AXIS_X, (int)[event deltaX]);
+                qemu_input_queue_rel(dcl.con, INPUT_AXIS_Y, (int)[event deltaY]);
             }
         } else {
             return false;
@@ -1033,7 +1049,7 @@ QemuCocoaView *cocoaView;
         for (index = 0; index < max_index; index++) {
             if (modifiers_state[index]) {
                 modifiers_state[index] = 0;
-                qemu_input_event_send_key_qcode(dcl->con, index, false);
+                qemu_input_event_send_key_qcode(dcl.con, index, false);
             }
         }
     });
@@ -1872,19 +1888,6 @@ static void cocoa_refresh(DisplayChangeListener *dcl)
     [pool release];
 }
 
-static void cocoa_cleanup(void)
-{
-    COCOA_DEBUG("qemu_cocoa: cocoa_cleanup\n");
-    g_free(dcl);
-}
-
-static const DisplayChangeListenerOps dcl_ops = {
-    .dpy_name          = "cocoa",
-    .dpy_gfx_update = cocoa_update,
-    .dpy_gfx_switch = cocoa_switch,
-    .dpy_refresh = cocoa_refresh,
-};
-
 static void cocoa_display_init(DisplayState *ds, DisplayOptions *opts)
 {
     COCOA_DEBUG("qemu_cocoa: cocoa_display_init\n");
@@ -1905,14 +1908,8 @@ static void cocoa_display_init(DisplayState *ds, DisplayOptions *opts)
         cursor_hide = 0;
     }
 
-    dcl = g_malloc0(sizeof(DisplayChangeListener));
-
     // register vga output callbacks
-    dcl->ops = &dcl_ops;
-    register_displaychangelistener(dcl);
-
-    // register cleanup function
-    atexit(cocoa_cleanup);
+    register_displaychangelistener(&dcl);
 }
 
 static QemuDisplay qemu_display_cocoa = {
